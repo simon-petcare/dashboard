@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard de Encuesta · Tiempo Real</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#0f0e0c;
+    --bg-2:#171512;
+    --ink:#f4ede0;
+    --ink-dim:#a89e8c;
+    --accent:#e8ff5a;
+    --accent-2:#ff6b3d;
+    --line:#2a2620;
+    --card:#1a1814;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:'Fraunces',serif;min-height:100vh}
+  body{
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(232,255,90,0.06), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(255,107,61,0.05), transparent 60%);
+  }
+  .wrap{max-width:1400px;margin:0 auto;padding:40px 32px 80px}
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:40px;
+    flex-wrap:wrap;gap:20px;
+  }
+  h1{
+    font-size:clamp(2rem,5vw,3.5rem);font-weight:800;line-height:0.95;
+    letter-spacing:-0.03em;font-style:italic;
+  }
+  h1 .accent{color:var(--accent);font-style:normal;font-weight:600}
+  .meta{font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--ink-dim);text-align:right}
+  .meta .live{display:inline-flex;align-items:center;gap:6px;color:var(--accent)}
+  .pulse{
+    width:8px;height:8px;border-radius:50%;background:var(--accent);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+  .config{
+    background:var(--card);border:1px solid var(--line);border-radius:8px;
+    padding:20px;margin-bottom:32px;
+  }
+  .config label{
+    display:block;font-family:'JetBrains Mono',monospace;font-size:0.7rem;
+    text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-dim);margin-bottom:8px;
+  }
+  .config input{
+    width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);
+    padding:12px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.85rem;
+  }
+  .config input:focus{outline:none;border-color:var(--accent)}
+  .config-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .config-row > div{flex:1;min-width:240px}
+  .btn{
+    background:var(--accent);color:var(--bg);border:none;padding:13px 24px;
+    border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;
+    font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;
+    transition:transform 0.15s;
+  }
+  .btn:hover{transform:translateY(-1px)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:40px}
+  .stat{
+    background:var(--card);border:1px solid var(--line);border-radius:8px;padding:24px;
+    position:relative;overflow:hidden;
+  }
+  .stat::before{
+    content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);
+  }
+  .stat .label{
+    font-family:'JetBrains Mono',monospace;font-size:0.65rem;text-transform:uppercase;
+    letter-spacing:0.12em;color:var(--ink-dim);margin-bottom:8px;
+  }
+  .stat .value{font-size:2.5rem;font-weight:800;line-height:1;letter-spacing:-0.02em}
+  .stat .sub{font-size:0.8rem;color:var(--ink-dim);margin-top:6px;font-style:italic}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:24px}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:8px;padding:28px;
+  }
+  .card h3{
+    font-size:1.15rem;font-weight:600;margin-bottom:4px;line-height:1.3;
+  }
+  .card .qmeta{
+    font-family:'JetBrains Mono',monospace;font-size:0.65rem;
+    text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-dim);margin-bottom:20px;
+  }
+  .chart-box{position:relative;height:280px}
+  .text-list{max-height:280px;overflow-y:auto;padding-right:8px}
+  .text-list::-webkit-scrollbar{width:6px}
+  .text-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+  .text-item{
+    padding:12px 14px;background:var(--bg);border-left:2px solid var(--accent-2);
+    margin-bottom:8px;font-size:0.9rem;line-height:1.5;border-radius:0 4px 4px 0;
+  }
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--ink-dim);font-style:italic;
+  }
+  .error{
+    background:rgba(255,107,61,0.1);border:1px solid var(--accent-2);
+    color:var(--accent-2);padding:16px;border-radius:6px;margin-bottom:24px;
+    font-family:'JetBrains Mono',monospace;font-size:0.8rem;
+  }
+  details summary{
+    cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.75rem;
+    color:var(--ink-dim);text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;
+  }
+  details p{margin-top:10px;font-size:0.85rem;color:var(--ink-dim);line-height:1.6}
+  details code{background:var(--bg);padding:2px 6px;border-radius:3px;color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Encuesta <span class="accent">/</span> <em>en vivo</em></h1>
+    <div class="meta">
+      <div class="live"><span class="pulse"></span> ACTUALIZACIÓN AUTO · 30s</div>
+      <div id="lastUpdate" style="margin-top:6px">—</div>
+    </div>
+  </header>
+
+  <div class="config">
+    <div class="config-row">
+      <div>
+        <label>URL CSV del Google Sheet</label>
+        <input id="csvUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/e/XXXX/pub?output=csv" />
+      </div>
+      <button class="btn" onclick="loadData()">Cargar</button>
+    </div>
+    <details>
+      <summary>¿Cómo obtengo esta URL?</summary>
+      <p>
+        En tu Google Sheet: <code>Archivo → Compartir → Publicar en la web</code>.
+        Elige la hoja con las respuestas, formato <code>Valores separados por comas (.csv)</code>,
+        y haz clic en <code>Publicar</code>. Copia la URL que te da y pégala arriba.
+        El dashboard se actualizará automáticamente cada 30 segundos.
+      </p>
+    </details>
+  </div>
+
+  <div id="errorBox"></div>
+
+  <div class="stats" id="stats"></div>
+  <div class="grid" id="charts"></div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'dashboard_csv_url';
+let charts = [];
+let refreshTimer = null;
+
+// Restore saved URL
+const savedUrl = sessionStorage.getItem(STORAGE_KEY);
+if(savedUrl){
+  document.getElementById('csvUrl').value = savedUrl;
+  loadData();
+}
+
+function loadData(){
+  const url = document.getElementById('csvUrl').value.trim();
+  if(!url){ showError('Pega la URL del CSV publicado.'); return; }
+  sessionStorage.setItem(STORAGE_KEY, url);
+  fetchAndRender(url);
+  if(refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(()=>fetchAndRender(url), 30000);
+}
+
+function showError(msg){
+  document.getElementById('errorBox').innerHTML = `<div class="error">⚠ ${msg}</div>`;
+}
+function clearError(){ document.getElementById('errorBox').innerHTML = ''; }
+
+async function fetchAndRender(url){
+  try{
+    // Cache-bust to get fresh data
+    const bust = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+    const res = await fetch(bust);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+    if(parsed.errors.length && !parsed.data.length){
+      throw new Error('No se pudo parsear el CSV');
+    }
+    clearError();
+    render(parsed.data, parsed.meta.fields || []);
+    document.getElementById('lastUpdate').textContent =
+      'ACTUALIZADO ' + new Date().toLocaleTimeString('es-PE');
+  }catch(err){
+    showError('Error al cargar: ' + err.message + '. Verifica que el sheet esté publicado como CSV.');
+  }
+}
+
+function detectColumnType(values){
+  const clean = values.filter(v => v !== '' && v != null);
+  if(clean.length === 0) return 'empty';
+  const unique = new Set(clean);
+  // Numeric scale (1-5, 1-10)
+  const allNum = clean.every(v => !isNaN(parseFloat(v)) && isFinite(v));
+  if(allNum && unique.size <= 11) return 'scale';
+  // Categorical: few unique values relative to total
+  if(unique.size <= Math.max(8, clean.length * 0.3)) return 'categorical';
+  // Multi-select (Google Forms uses ", " separator for checkboxes)
+  const hasMulti = clean.some(v => typeof v === 'string' && v.includes(', '));
+  if(hasMulti && unique.size > clean.length * 0.4) return 'multiselect';
+  return 'text';
+}
+
+function isTimestamp(field){
+  return /marca temporal|timestamp|fecha/i.test(field);
+}
+
+function render(rows, fields){
+  if(!rows.length){
+    document.getElementById('stats').innerHTML = '';
+    document.getElementById('charts').innerHTML = '<div class="empty">Aún no hay respuestas en tu formulario.</div>';
+    return;
+  }
+
+  // Stats globales
+  const total = rows.length;
+  const tsField = fields.find(isTimestamp);
+  let lastResp = '—', today = 0;
+  if(tsField){
+    const dates = rows.map(r => new Date(r[tsField])).filter(d => !isNaN(d));
+    if(dates.length){
+      const max = new Date(Math.max(...dates));
+      lastResp = max.toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      const todayStr = new Date().toDateString();
+      today = dates.filter(d => d.toDateString() === todayStr).length;
+    }
+  }
+  const questionFields = fields.filter(f => !isTimestamp(f));
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="label">Respuestas totales</div><div class="value">${total}</div><div class="sub">desde el inicio</div></div>
+    <div class="stat"><div class="label">Hoy</div><div class="value">${today}</div><div class="sub">nuevas respuestas</div></div>
+    <div class="stat"><div class="label">Preguntas</div><div class="value">${questionFields.length}</div><div class="sub">analizadas</div></div>
+    <div class="stat"><div class="label">Última</div><div class="value" style="font-size:1.1rem;font-family:'JetBrains Mono',monospace">${lastResp}</div><div class="sub">respuesta recibida</div></div>
+  `;
+
+  // Destruir charts previos
+  charts.forEach(c => c.destroy());
+  charts = [];
+
+  const grid = document.getElementById('charts');
+  grid.innerHTML = '';
+
+  questionFields.forEach((field, idx) => {
+    const values = rows.map(r => r[field]);
+    const type = detectColumnType(values);
+    const card = document.createElement('div');
+    card.className = 'card';
+    const safeId = 'chart_' + idx;
+    card.innerHTML = `
+      <h3>${escapeHtml(field)}</h3>
+      <div class="qmeta">${typeLabel(type)} · ${values.filter(v=>v).length} respuestas</div>
+      ${type === 'text' ? `<div class="text-list" id="${safeId}"></div>` : `<div class="chart-box"><canvas id="${safeId}"></canvas></div>`}
+    `;
+    grid.appendChild(card);
+
+    if(type === 'categorical' || type === 'scale'){
+      renderBar(safeId, values, type);
+    }else if(type === 'multiselect'){
+      renderMultiBar(safeId, values);
+    }else if(type === 'text'){
+      renderText(safeId, values);
+    }
+  });
+}
+
+function typeLabel(t){
+  return {scale:'Escala numérica',categorical:'Opción única',multiselect:'Opción múltiple',text:'Respuesta abierta',empty:'Sin datos'}[t] || t;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function countValues(values){
+  const counts = {};
+  values.forEach(v => { if(v==='' || v==null) return; counts[v] = (counts[v]||0)+1; });
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+}
+
+function renderBar(canvasId, values, type){
+  const sorted = type === 'scale'
+    ? countValues(values).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]))
+    : countValues(values);
+  const ctx = document.getElementById(canvasId);
+  const chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(s=>s[0]),
+      datasets:[{
+        data: sorted.map(s=>s[1]),
+        backgroundColor:'#e8ff5a',
+        borderRadius:4,
+      }]
+    },
+    options:chartOpts()
+  });
+  charts.push(chart);
+}
+
+function renderMultiBar(canvasId, values){
+  const counts = {};
+  values.forEach(v => {
+    if(!v) return;
+    String(v).split(', ').forEach(opt => {
+      const o = opt.trim();
+      if(o) counts[o] = (counts[o]||0)+1;
+    });
+  });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const ctx = document.getElementById(canvasId);
+  const chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(s=>s[0]),
+      datasets:[{
+        data: sorted.map(s=>s[1]),
+        backgroundColor:'#ff6b3d',
+        borderRadius:4,
+      }]
+    },
+    options:{...chartOpts(), indexAxis:'y'}
+  });
+  charts.push(chart);
+}
+
+function renderText(divId, values){
+  const list = values.filter(v => v && String(v).trim()).slice(-15).reverse();
+  const el = document.getElementById(divId);
+  if(!list.length){ el.innerHTML = '<div class="empty">Sin respuestas aún.</div>'; return; }
+  el.innerHTML = list.map(v => `<div class="text-item">${escapeHtml(v)}</div>`).join('');
+}
+
+function chartOpts(){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:'#a89e8c',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2a2620'}},
+      y:{ticks:{color:'#a89e8c',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2a2620'},beginAtZero:true}
+    }
+  };
+}
+</script>
+</body>
+</html>
