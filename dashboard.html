@@ -3,165 +3,184 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dashboard de Encuesta · Tiempo Real</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<title>Dashboard Simón · Resultados en vivo</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
   :root{
-    --bg:#0f0e0c;
-    --bg-2:#171512;
-    --ink:#f4ede0;
-    --ink-dim:#a89e8c;
-    --accent:#e8ff5a;
-    --accent-2:#ff6b3d;
-    --line:#2a2620;
-    --card:#1a1814;
+    --bg:#eaf0fb;
+    --bg-2:#f5f7fa;
+    --primary:#1e40c4;
+    --primary-dark:#152d8a;
+    --primary-soft:#eff6ff;
+    --accent:#fdd835;
+    --accent-dark:#f9a825;
+    --card:#ffffff;
+    --border:#dbe4f3;
+    --text:#1a1f36;
+    --muted:#6b7280;
+    --ok:#059669;
+    --warn:#dc2626;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:var(--bg);color:var(--ink);font-family:'Fraunces',serif;min-height:100vh}
-  body{
-    background-image:
-      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(232,255,90,0.06), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(255,107,61,0.05), transparent 60%);
-  }
-  .wrap{max-width:1400px;margin:0 auto;padding:40px 32px 80px}
-  header{
-    display:flex;justify-content:space-between;align-items:flex-end;
-    border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:40px;
-    flex-wrap:wrap;gap:20px;
-  }
-  h1{
-    font-size:clamp(2rem,5vw,3.5rem);font-weight:800;line-height:0.95;
-    letter-spacing:-0.03em;font-style:italic;
-  }
-  h1 .accent{color:var(--accent);font-style:normal;font-weight:600}
-  .meta{font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--ink-dim);text-align:right}
-  .meta .live{display:inline-flex;align-items:center;gap:6px;color:var(--accent)}
-  .pulse{
-    width:8px;height:8px;border-radius:50%;background:var(--accent);
-    animation:pulse 1.6s ease-in-out infinite;
-  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  body{background:linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);min-height:100vh;color:var(--text);padding:24px;line-height:1.5}
+  .wrap{max-width:1400px;margin:0 auto}
+  header{background:var(--card);border-radius:16px;padding:24px 28px;box-shadow:0 4px 20px rgba(30,64,196,.08);border-top:5px solid var(--accent);margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+  h1{color:var(--primary-dark);font-size:26px;font-weight:700;letter-spacing:-0.02em}
+  h1 .pet{margin-right:8px}
+  .subtitle{color:var(--muted);font-size:13px;margin-top:2px}
+  .live{display:inline-flex;align-items:center;gap:8px;background:var(--primary-soft);color:var(--primary);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
-  .config{
-    background:var(--card);border:1px solid var(--line);border-radius:8px;
-    padding:20px;margin-bottom:32px;
-  }
-  .config label{
-    display:block;font-family:'JetBrains Mono',monospace;font-size:0.7rem;
-    text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-dim);margin-bottom:8px;
-  }
-  .config input{
-    width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);
-    padding:12px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.85rem;
-  }
-  .config input:focus{outline:none;border-color:var(--accent)}
-  .config-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
-  .config-row > div{flex:1;min-width:240px}
-  .btn{
-    background:var(--accent);color:var(--bg);border:none;padding:13px 24px;
-    border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;
-    font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;
-    transition:transform 0.15s;
-  }
-  .btn:hover{transform:translateY(-1px)}
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:40px}
-  .stat{
-    background:var(--card);border:1px solid var(--line);border-radius:8px;padding:24px;
-    position:relative;overflow:hidden;
-  }
-  .stat::before{
-    content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);
-  }
-  .stat .label{
-    font-family:'JetBrains Mono',monospace;font-size:0.65rem;text-transform:uppercase;
-    letter-spacing:0.12em;color:var(--ink-dim);margin-bottom:8px;
-  }
-  .stat .value{font-size:2.5rem;font-weight:800;line-height:1;letter-spacing:-0.02em}
-  .stat .sub{font-size:0.8rem;color:var(--ink-dim);margin-top:6px;font-style:italic}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:24px}
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:8px;padding:28px;
-  }
-  .card h3{
-    font-size:1.15rem;font-weight:600;margin-bottom:4px;line-height:1.3;
-  }
-  .card .qmeta{
-    font-family:'JetBrains Mono',monospace;font-size:0.65rem;
-    text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-dim);margin-bottom:20px;
-  }
-  .chart-box{position:relative;height:280px}
-  .text-list{max-height:280px;overflow-y:auto;padding-right:8px}
-  .text-list::-webkit-scrollbar{width:6px}
-  .text-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
-  .text-item{
-    padding:12px 14px;background:var(--bg);border-left:2px solid var(--accent-2);
-    margin-bottom:8px;font-size:0.9rem;line-height:1.5;border-radius:0 4px 4px 0;
-  }
-  .empty{
-    text-align:center;padding:60px 20px;color:var(--ink-dim);font-style:italic;
-  }
-  .error{
-    background:rgba(255,107,61,0.1);border:1px solid var(--accent-2);
-    color:var(--accent-2);padding:16px;border-radius:6px;margin-bottom:24px;
-    font-family:'JetBrains Mono',monospace;font-size:0.8rem;
-  }
-  details summary{
-    cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.75rem;
-    color:var(--ink-dim);text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;
-  }
-  details p{margin-top:10px;font-size:0.85rem;color:var(--ink-dim);line-height:1.6}
-  details code{background:var(--bg);padding:2px 6px;border-radius:3px;color:var(--accent)}
+  .last-update{font-size:11px;color:var(--muted);margin-top:4px;text-align:right}
+  .config{background:var(--card);border-radius:12px;padding:16px 20px;box-shadow:0 2px 10px rgba(30,64,196,.06);margin-bottom:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .config input{flex:1;min-width:280px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px}
+  .config input:focus{outline:none;border-color:var(--primary)}
+  .btn{background:var(--primary);color:#fff;border:0;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(30,64,196,.3);transition:.15s}
+  .btn:hover{background:var(--primary-dark);transform:translateY(-1px)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+  .kpi{background:var(--card);border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(30,64,196,.06);position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:var(--accent)}
+  .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px;font-weight:600}
+  .kpi-val{font-size:32px;font-weight:700;color:var(--primary-dark);line-height:1}
+  .kpi-sub{font-size:12px;color:var(--muted);margin-top:6px}
+  .kpi-emoji{position:absolute;top:14px;right:14px;font-size:24px;opacity:0.5}
+  .section{background:var(--card);border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(30,64,196,.06);margin-bottom:24px}
+  .section-title{font-size:18px;font-weight:700;color:var(--primary-dark);padding-bottom:12px;margin-bottom:18px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:10px}
+  .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px}
+  .card{background:#fafbff;border:1px solid var(--border);border-radius:10px;padding:18px}
+  .card h4{font-size:14px;font-weight:600;margin-bottom:4px;color:var(--text);line-height:1.3}
+  .card .qmeta{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:14px}
+  .chart-box{position:relative;height:240px}
+  .chart-box.tall{height:340px}
+  .text-list{max-height:260px;overflow-y:auto;padding-right:6px}
+  .text-list::-webkit-scrollbar{width:5px}
+  .text-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  .text-item{padding:10px 12px;background:#fff;border-left:3px solid var(--accent);margin-bottom:8px;font-size:13px;line-height:1.5;border-radius:0 6px 6px 0}
+  .empty{text-align:center;padding:40px 20px;color:var(--muted);font-style:italic;font-size:13px}
+  .ipa-explainer{background:var(--primary-soft);border-left:4px solid var(--primary);padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;color:var(--primary-dark)}
+  .contact-table{width:100%;border-collapse:collapse;font-size:13px}
+  .contact-table th{background:#fafbff;text-align:left;padding:10px 12px;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid var(--border)}
+  .contact-table td{padding:10px 12px;border-bottom:1px solid var(--border)}
+  .contact-table tr:hover td{background:#fafbff}
+  .error{background:#fee;border:1px solid var(--warn);color:var(--warn);padding:14px 18px;border-radius:8px;margin-bottom:20px;font-size:13px}
+  details summary{cursor:pointer;font-size:12px;color:var(--muted)}
+  details p{margin-top:8px;font-size:12px;color:var(--muted);line-height:1.6}
+  details code{background:var(--primary-soft);padding:2px 6px;border-radius:3px;color:var(--primary)}
+  .badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em}
+  .badge-warn{background:#fee2e2;color:#991b1b}
+  .badge-ok{background:#d1fae5;color:#065f46}
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
-    <h1>Encuesta <span class="accent">/</span> <em>en vivo</em></h1>
-    <div class="meta">
-      <div class="live"><span class="pulse"></span> ACTUALIZACIÓN AUTO · 30s</div>
-      <div id="lastUpdate" style="margin-top:6px">—</div>
+    <div>
+      <h1><span class="pet">🐾</span>Simón · Dashboard de Resultados</h1>
+      <div class="subtitle">Encuesta sobre cuidado de mascotas en Lima · Universidad del Pacífico</div>
+    </div>
+    <div>
+      <div class="live"><span class="pulse"></span> EN VIVO · actualiza cada 30s</div>
+      <div class="last-update" id="lastUpdate">—</div>
     </div>
   </header>
 
   <div class="config">
-    <div class="config-row">
-      <div>
-        <label>URL CSV del Google Sheet</label>
-        <input id="csvUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/e/XXXX/pub?output=csv" />
-      </div>
-      <button class="btn" onclick="loadData()">Cargar</button>
-    </div>
+    <input id="csvUrl" type="text" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vTd3T-aJmYVrDA8Rgty42vJU9J4Oo_lZcD5EMPPFoTe34SrRN5cFJVp7mkCyjfbUnYvuefAwkPTmqlG/pub?output=csv" />
+    <button class="btn" onclick="loadData()">Recargar</button>
     <details>
-      <summary>¿Cómo obtengo esta URL?</summary>
-      <p>
-        En tu Google Sheet: <code>Archivo → Compartir → Publicar en la web</code>.
-        Elige la hoja con las respuestas, formato <code>Valores separados por comas (.csv)</code>,
-        y haz clic en <code>Publicar</code>. Copia la URL que te da y pégala arriba.
-        El dashboard se actualizará automáticamente cada 30 segundos.
-      </p>
+      <summary>Info</summary>
+      <p>Lee el Google Sheet publicado como CSV. Para que aparezcan respuestas nuevas, deben pasar al sheet a través del Apps Script (<code>POST</code>) y el sheet debe estar publicado en la web.</p>
     </details>
   </div>
 
   <div id="errorBox"></div>
-
-  <div class="stats" id="stats"></div>
-  <div class="grid" id="charts"></div>
+  <div id="content"></div>
 
 </div>
 
 <script>
-const STORAGE_KEY = 'dashboard_csv_url';
+const Q = {
+  p1:  {label:'Edad', type:'single', order:['18 – 25 años','26 – 35 años','36 – 45 años','46 – 55 años','Más de 55 años'], emoji:'🎂'},
+  p2:  {label:'Sexo', type:'single', emoji:'👤'},
+  p3:  {label:'Estado civil', type:'single', emoji:'💍'},
+  p5:  {label:'Distrito de residencia', type:'single', emoji:'📍'},
+  p6:  {label:'Situación laboral', type:'single', emoji:'💼'},
+  p7:  {label:'Con quién vive', type:'single', emoji:'🏠'},
+  p8:  {label:'Noches fuera de casa (verano)', type:'single', order:['Nunca','1 a 2 veces','3 a 5 veces','6 a 10 veces','Más de 10 veces'], emoji:'☀️'},
+  p9:  {label:'Noches fuera de casa (resto del año)', type:'single', order:['Nunca o casi nunca','1 a 2 veces al año','3 a 5 veces al año','6 a 10 veces al año','Más de 10 veces al año'], emoji:'📅'},
+  p11: {label:'¿Toma decisiones sobre el cuidado del perro?', type:'single', emoji:'🎯'},
+  p13: {label:'Tamaño del perro', type:'multi_split', emoji:'🐕', subcols:{
+    p13_pequeno_menos_de_10_kg:'Pequeño (<10 kg)',
+    p13_mediano_10_a_25_kg:'Mediano (10-25 kg)',
+    p13_grande_mas_de_25_kg:'Grande (>25 kg)'
+  }},
+  p14: {label:'Relación con el perro', type:'single', emoji:'❤️'},
+  p15: {label:'Frecuencia con que deja al perro al cuidado', type:'single', order:['Nunca lo he dejado al cuidado de nadie','Rara vez (1 o 2 veces al año)','Ocasionalmente (cada 2 o 3 meses)','Con frecuencia (1 o 2 veces al mes)','Muy seguido (varias veces al mes o semanalmente)'], emoji:'🔄'},
+  p16: {label:'Duración típica de la ausencia', type:'single', order:['Solo unas horas (medio día)','1 día completo','2 a 3 días','4 a 7 días','Más de una semana'], emoji:'⏱️'},
+  p17: {label:'¿Con quién deja al perro?', type:'multi_split', emoji:'🐾', subcols:{
+    p17_con_un_familiar:'Familiar',
+    p17_con_un_amigo_o_conocido:'Amigo/conocido',
+    p17_con_un_vecino:'Vecino',
+    p17_en_un_hospedaje_canino_u_:'Hospedaje canino',
+    p17_con_un_cuidador_independi:'Cuidador independiente',
+    p17_en_la_veterinaria:'Veterinaria',
+    p17_a_traves_de_una_aplicacio:'App/plataforma',
+    p17_no_he_dejado_a_mi_perro_a:'No lo ha dejado',
+    p17_otro:'Otro'
+  }},
+  p19: {label:'Satisfacción última vez (1-5)', type:'scale', emoji:'⭐'},
+  p20: {label:'Problemas con hospedaje canino', type:'multi_split', emoji:'⚠️', subcols:{
+    p20_estaba_lejos_de_mi_casa:'Lejos de casa',
+    p20_precio_alto_para_lo_que_o:'Precio alto',
+    p20_instalaciones_no_dieron_c:'Instalaciones sin confianza',
+    p20_mezclaban_perros_de_difer:'Mezclan tamaños',
+    p20_no_recibi_actualizaciones:'Sin actualizaciones',
+    p20_mi_perro_regreso_en_peor_:'Regresó en peor estado',
+    p20_el_cuidado_no_fue_persona:'Cuidado no personalizado',
+    p20_no_experimente_ningun_pro:'Sin problemas',
+    p20_no_aplica_no_he_usado_hos:'No aplica',
+    p20_otro:'Otro'
+  }},
+  p21: {label:'Dificultad para encontrar opción de confianza (1-5)', type:'scale', emoji:'🔍'},
+  p22: {label:'¿Dejó de viajar por no tener con quién dejar al perro?', type:'single', emoji:'✈️'},
+  p23: {label:'Fuentes para evaluar confiabilidad', type:'multi_split', emoji:'🔎', subcols:{
+    p23_recomendacion_de_familiar:'Recomendación familiar/amigos',
+    p23_resenas_en_google_faceboo:'Reseñas online',
+    p23_visita_previa_al_lugar:'Visita previa',
+    p23_entrevista_con_el_cuidado:'Entrevista al cuidador',
+    p23_grupos_de_duenos_de_perro:'Grupos de dueños',
+    p23_mi_propia_intuicion:'Intuición propia',
+    p23_el_precio_del_servicio:'Precio del servicio',
+    p23_otro:'Otro'
+  }},
+  p27: {label:'Gasto mensual en cuidado del perro', type:'single', order:['Menos de S/ 100','S/ 100 – S/ 200','S/ 201 – S/ 350','S/ 351 – S/ 500','S/ 501 – S/ 800','Más de S/ 800','Prefiero no responder'], emoji:'💰'},
+  p28: {label:'Disposición a pagar por noche en hospedaje', type:'single', order:['Menos de S/ 40','S/ 40 – S/ 70','S/ 71 – S/ 100','S/ 101 – S/ 150','Más de S/ 150'], emoji:'💸'},
+};
+
+const ATRIBUTOS = [
+  {key:'cercania_al_domicilio', label:'Cercanía al domicilio'},
+  {key:'precio_justo', label:'Precio justo'},
+  {key:'confianza_en_las_instalac', label:'Confianza en instalaciones'},
+  {key:'separacion_de_perros_por_', label:'Separación por tamaño'},
+  {key:'actualizaciones_con_fotos', label:'Actualizaciones con fotos'},
+  {key:'cuidado_personalizado_a_m', label:'Cuidado personalizado'},
+  {key:'seguridad_fisica_del_loca', label:'Seguridad física'},
+  {key:'atencion_veterinaria_disp', label:'Atención veterinaria'},
+  {key:'experiencia_y_reputacion_', label:'Experiencia y reputación'},
+  {key:'trato_carinoso', label:'Trato cariñoso'},
+];
+
+const STORAGE_KEY = 'simon_dashboard_url';
 let charts = [];
 let refreshTimer = null;
 
-// Restore saved URL
-const savedUrl = sessionStorage.getItem(STORAGE_KEY);
-if(savedUrl){
-  document.getElementById('csvUrl').value = savedUrl;
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = sessionStorage.getItem(STORAGE_KEY);
+  if(saved) document.getElementById('csvUrl').value = saved;
   loadData();
-}
+});
 
 function loadData(){
   const url = document.getElementById('csvUrl').value.trim();
@@ -179,7 +198,6 @@ function clearError(){ document.getElementById('errorBox').innerHTML = ''; }
 
 async function fetchAndRender(url){
   try{
-    // Cache-bust to get fresh data
     const bust = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
     const res = await fetch(bust);
     if(!res.ok) throw new Error('HTTP ' + res.status);
@@ -189,168 +207,404 @@ async function fetchAndRender(url){
       throw new Error('No se pudo parsear el CSV');
     }
     clearError();
-    render(parsed.data, parsed.meta.fields || []);
+    render(parsed.data);
     document.getElementById('lastUpdate').textContent =
-      'ACTUALIZADO ' + new Date().toLocaleTimeString('es-PE');
+      'Actualizado ' + new Date().toLocaleTimeString('es-PE');
   }catch(err){
     showError('Error al cargar: ' + err.message + '. Verifica que el sheet esté publicado como CSV.');
   }
 }
 
-function detectColumnType(values){
-  const clean = values.filter(v => v !== '' && v != null);
-  if(clean.length === 0) return 'empty';
-  const unique = new Set(clean);
-  // Numeric scale (1-5, 1-10)
-  const allNum = clean.every(v => !isNaN(parseFloat(v)) && isFinite(v));
-  if(allNum && unique.size <= 11) return 'scale';
-  // Categorical: few unique values relative to total
-  if(unique.size <= Math.max(8, clean.length * 0.3)) return 'categorical';
-  // Multi-select (Google Forms uses ", " separator for checkboxes)
-  const hasMulti = clean.some(v => typeof v === 'string' && v.includes(', '));
-  if(hasMulti && unique.size > clean.length * 0.4) return 'multiselect';
-  return 'text';
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function isTimestamp(field){
-  return /marca temporal|timestamp|fecha/i.test(field);
-}
+function render(rows){
+  charts.forEach(c => { try{ c.destroy(); }catch(e){} });
+  charts = [];
 
-function render(rows, fields){
+  const content = document.getElementById('content');
+
   if(!rows.length){
-    document.getElementById('stats').innerHTML = '';
-    document.getElementById('charts').innerHTML = '<div class="empty">Aún no hay respuestas en tu formulario.</div>';
+    content.innerHTML = '<div class="section"><div class="empty">Aún no hay respuestas en la encuesta. 🐶</div></div>';
     return;
   }
 
-  // Stats globales
   const total = rows.length;
-  const tsField = fields.find(isTimestamp);
-  let lastResp = '—', today = 0;
-  if(tsField){
-    const dates = rows.map(r => new Date(r[tsField])).filter(d => !isNaN(d));
-    if(dates.length){
-      const max = new Date(Math.max(...dates));
-      lastResp = max.toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-      const todayStr = new Date().toDateString();
-      today = dates.filter(d => d.toDateString() === todayStr).length;
-    }
-  }
-  const questionFields = fields.filter(f => !isTimestamp(f));
+  const tsField = Object.keys(rows[0]).find(k => /timestamp|marca/i.test(k)) || 'timestamp';
+  const dates = rows.map(r => new Date(r[tsField])).filter(d => !isNaN(d));
+  const todayStr = new Date().toDateString();
+  const today = dates.filter(d => d.toDateString() === todayStr).length;
+  const lastResp = dates.length ? new Date(Math.max(...dates)).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
 
-  document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="label">Respuestas totales</div><div class="value">${total}</div><div class="sub">desde el inicio</div></div>
-    <div class="stat"><div class="label">Hoy</div><div class="value">${today}</div><div class="sub">nuevas respuestas</div></div>
-    <div class="stat"><div class="label">Preguntas</div><div class="value">${questionFields.length}</div><div class="sub">analizadas</div></div>
-    <div class="stat"><div class="label">Última</div><div class="value" style="font-size:1.1rem;font-family:'JetBrains Mono',monospace">${lastResp}</div><div class="sub">respuesta recibida</div></div>
+  const att1Fail = rows.filter(r => r.p18 && r.p18 !== 'Casi nunca').length;
+  const att2Fail = rows.filter(r => r.p24 && r.p24 !== 'De acuerdo').length;
+  const validResponses = rows.filter(r => (!r.p18 || r.p18==='Casi nunca') && (!r.p24 || r.p24==='De acuerdo')).length;
+
+  const contactos = rows.filter(r => (r.c_nombre && r.c_nombre.trim()) || (r.c_celular && r.c_celular.trim()) || (r.c_email && r.c_email.trim()));
+
+  let html = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-emoji">📊</div><div class="kpi-label">Respuestas totales</div><div class="kpi-val">${total}</div><div class="kpi-sub">desde el inicio</div></div>
+      <div class="kpi"><div class="kpi-emoji">📅</div><div class="kpi-label">Hoy</div><div class="kpi-val">${today}</div><div class="kpi-sub">nuevas respuestas</div></div>
+      <div class="kpi"><div class="kpi-emoji">✅</div><div class="kpi-label">Válidas (atención OK)</div><div class="kpi-val">${validResponses}</div><div class="kpi-sub">${total>0?Math.round(validResponses/total*100):0}% del total</div></div>
+      <div class="kpi"><div class="kpi-emoji">📨</div><div class="kpi-label">Contactos dejados</div><div class="kpi-val">${contactos.length}</div><div class="kpi-sub">interesados en Simón</div></div>
+      <div class="kpi"><div class="kpi-emoji">🕐</div><div class="kpi-label">Última respuesta</div><div class="kpi-val" style="font-size:14px;font-weight:600">${lastResp}</div><div class="kpi-sub">recibida</div></div>
+    </div>
   `;
 
-  // Destruir charts previos
-  charts.forEach(c => c.destroy());
-  charts = [];
+  html += sectionHTML('👤 Perfil demográfico', ['p1','p2','p3','p5','p6','p7']);
+  html += sectionHTML('🏖️ Viajes y mascota', ['p8','p9','p11','p13','p14']);
+  html += sectionHTML('🐕 Uso de servicios de cuidado', ['p15','p16','p17','p19','p20']);
+  html += sectionHTML('🔎 Búsqueda y confianza', ['p21','p22','p23']);
+  html += sectionHTML('💰 Disposición a pagar', ['p27','p28']);
 
-  const grid = document.getElementById('charts');
-  grid.innerHTML = '';
+  html += `
+    <div class="section">
+      <div class="section-title">🎯 Importancia vs. Satisfacción (IPA)</div>
+      <div class="ipa-explainer">
+        <b>Cómo leer este gráfico:</b> cada punto es un atributo. El eje X es qué tan <b>importante</b> es para los usuarios (p25), el eje Y qué tan <b>satisfechos</b> están con la oferta actual (p26).
+        Los puntos en el cuadrante <b>inferior derecho</b> (alta importancia, baja satisfacción) representan las <b>mejores oportunidades</b> para Simón. 🎯
+      </div>
+      <div class="card">
+        <div class="chart-box tall"><canvas id="ipa_chart"></canvas></div>
+      </div>
+      <div class="grid-2" style="margin-top:20px">
+        <div class="card">
+          <h4>📊 Importancia promedio por atributo (p25)</h4>
+          <div class="qmeta">Escala 1-5 · ${rows.length} respuestas</div>
+          <div class="chart-box tall"><canvas id="imp_chart"></canvas></div>
+        </div>
+        <div class="card">
+          <h4>😊 Satisfacción promedio por atributo (p26)</h4>
+          <div class="qmeta">Escala 1-5 · ${rows.length} respuestas</div>
+          <div class="chart-box tall"><canvas id="sat_chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  `;
 
-  questionFields.forEach((field, idx) => {
-    const values = rows.map(r => r[field]);
-    const type = detectColumnType(values);
-    const card = document.createElement('div');
-    card.className = 'card';
-    const safeId = 'chart_' + idx;
-    card.innerHTML = `
-      <h3>${escapeHtml(field)}</h3>
-      <div class="qmeta">${typeLabel(type)} · ${values.filter(v=>v).length} respuestas</div>
-      ${type === 'text' ? `<div class="text-list" id="${safeId}"></div>` : `<div class="chart-box"><canvas id="${safeId}"></canvas></div>`}
+  html += `
+    <div class="section">
+      <div class="section-title">💭 Servicio ideal (texto libre · p30)</div>
+      <div class="card">
+        <h4>Las últimas 20 respuestas</h4>
+        <div class="qmeta">Pregunta opcional · ${rows.filter(r => r.p30 && r.p30.trim()).length} respuestas con texto</div>
+        <div class="text-list" id="text_p30"></div>
+      </div>
+    </div>
+  `;
+
+  html += `
+    <div class="section">
+      <div class="section-title">🛡️ Calidad de datos · Preguntas de atención</div>
+      <div class="grid-2">
+        <div class="card">
+          <h4>P18 — Esperaba "Casi nunca"</h4>
+          <div class="qmeta">Detecta respuestas automáticas</div>
+          <div style="font-size:14px;line-height:2">
+            <span class="badge badge-ok">OK</span> ${total - att1Fail} respuestas correctas<br>
+            <span class="badge badge-warn">Falló</span> ${att1Fail} respuestas (${total>0?Math.round(att1Fail/total*100):0}%)
+          </div>
+        </div>
+        <div class="card">
+          <h4>P24 — Esperaba "De acuerdo"</h4>
+          <div class="qmeta">Detecta respuestas automáticas</div>
+          <div style="font-size:14px;line-height:2">
+            <span class="badge badge-ok">OK</span> ${total - att2Fail} respuestas correctas<br>
+            <span class="badge badge-warn">Falló</span> ${att2Fail} respuestas (${total>0?Math.round(att2Fail/total*100):0}%)
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if(contactos.length){
+    html += `
+      <div class="section">
+        <div class="section-title">📨 Interesados en saber más sobre Simón</div>
+        <div style="overflow-x:auto">
+          <table class="contact-table">
+            <thead><tr><th>Nombre</th><th>Celular/WhatsApp</th><th>Email</th><th>Fecha</th></tr></thead>
+            <tbody>
+              ${contactos.slice().reverse().map(r => `
+                <tr>
+                  <td>${escapeHtml(r.c_nombre || '—')}</td>
+                  <td>${escapeHtml(r.c_celular || '—')}</td>
+                  <td>${escapeHtml(r.c_email || '—')}</td>
+                  <td>${r[tsField] ? new Date(r[tsField]).toLocaleDateString('es-PE') : '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
     `;
-    grid.appendChild(card);
+  }
 
-    if(type === 'categorical' || type === 'scale'){
-      renderBar(safeId, values, type);
-    }else if(type === 'multiselect'){
-      renderMultiBar(safeId, values);
-    }else if(type === 'text'){
-      renderText(safeId, values);
-    }
+  content.innerHTML = html;
+
+  ['p1','p2','p3','p5','p6','p7','p8','p9','p11','p13','p14','p15','p16','p17','p19','p20','p21','p22','p23','p27','p28'].forEach(id => {
+    const def = Q[id];
+    if(!def) return;
+    if(def.type === 'single') renderBar('chart_'+id, rows, id, def.order);
+    else if(def.type === 'multi_split') renderMultiSplit('chart_'+id, rows, def.subcols);
+    else if(def.type === 'scale') renderScale('chart_'+id, rows, id);
   });
+
+  renderTextList('text_p30', rows.map(r => r.p30).filter(v => v && v.trim()));
+  renderIPA(rows);
+  renderAttributeBars('imp_chart', rows, 'p25_', '#1e40c4');
+  renderAttributeBars('sat_chart', rows, 'p26_', '#fdd835');
 }
 
-function typeLabel(t){
-  return {scale:'Escala numérica',categorical:'Opción única',multiselect:'Opción múltiple',text:'Respuesta abierta',empty:'Sin datos'}[t] || t;
-}
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function sectionHTML(title, ids){
+  let h = `<div class="section"><div class="section-title">${title}</div><div class="grid-2">`;
+  ids.forEach(id => {
+    const def = Q[id];
+    if(!def) return;
+    h += `
+      <div class="card">
+        <h4>${def.emoji||''} ${def.label}</h4>
+        <div class="qmeta">Pregunta ${id.toUpperCase()}</div>
+        <div class="chart-box"><canvas id="chart_${id}"></canvas></div>
+      </div>
+    `;
+  });
+  h += '</div></div>';
+  return h;
 }
 
 function countValues(values){
   const counts = {};
   values.forEach(v => { if(v==='' || v==null) return; counts[v] = (counts[v]||0)+1; });
-  return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  return counts;
 }
 
-function renderBar(canvasId, values, type){
-  const sorted = type === 'scale'
-    ? countValues(values).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]))
-    : countValues(values);
-  const ctx = document.getElementById(canvasId);
-  const chart = new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels: sorted.map(s=>s[0]),
-      datasets:[{
-        data: sorted.map(s=>s[1]),
-        backgroundColor:'#e8ff5a',
-        borderRadius:4,
-      }]
-    },
-    options:chartOpts()
-  });
-  charts.push(chart);
-}
-
-function renderMultiBar(canvasId, values){
-  const counts = {};
-  values.forEach(v => {
-    if(!v) return;
-    String(v).split(', ').forEach(opt => {
-      const o = opt.trim();
-      if(o) counts[o] = (counts[o]||0)+1;
+function renderBar(canvasId, rows, field, predefinedOrder){
+  const counts = countValues(rows.map(r => r[field]));
+  let entries;
+  if(predefinedOrder){
+    entries = predefinedOrder.filter(o => counts[o]).map(o => [o, counts[o]]);
+    Object.entries(counts).forEach(([k,v]) => {
+      if(!predefinedOrder.includes(k)) entries.push([k,v]);
     });
-  });
-  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  } else {
+    entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  }
   const ctx = document.getElementById(canvasId);
+  if(!ctx) return;
   const chart = new Chart(ctx, {
     type:'bar',
     data:{
-      labels: sorted.map(s=>s[0]),
+      labels: entries.map(e=>e[0]),
       datasets:[{
-        data: sorted.map(s=>s[1]),
-        backgroundColor:'#ff6b3d',
-        borderRadius:4,
+        data: entries.map(e=>e[1]),
+        backgroundColor:'#1e40c4',
+        borderRadius:6,
       }]
     },
-    options:{...chartOpts(), indexAxis:'y'}
+    options: chartOpts(entries.length > 5 ? 'y' : 'x')
   });
   charts.push(chart);
 }
 
-function renderText(divId, values){
-  const list = values.filter(v => v && String(v).trim()).slice(-15).reverse();
+function renderMultiSplit(canvasId, rows, subcols){
+  const entries = Object.entries(subcols).map(([col, label]) => {
+    const count = rows.filter(r => {
+      const v = r[col];
+      return v && v.toString().trim() && v.toString().toLowerCase() !== 'false' && v.toString() !== '0';
+    }).length;
+    return [label, count];
+  }).sort((a,b)=>b[1]-a[1]);
+
+  const ctx = document.getElementById(canvasId);
+  if(!ctx) return;
+  const chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: entries.map(e=>e[0]),
+      datasets:[{
+        data: entries.map(e=>e[1]),
+        backgroundColor:'#fdd835',
+        borderColor:'#f9a825',
+        borderWidth:1,
+        borderRadius:6,
+      }]
+    },
+    options: chartOpts('y')
+  });
+  charts.push(chart);
+}
+
+function renderScale(canvasId, rows, field){
+  const counts = {};
+  for(let i=1;i<=5;i++) counts[i] = 0;
+  rows.forEach(r => {
+    const n = parseInt(r[field]);
+    if(n >= 1 && n <= 5) counts[n]++;
+  });
+  const ctx = document.getElementById(canvasId);
+  if(!ctx) return;
+  const colors = ['#dc2626','#f97316','#fdd835','#84cc16','#059669'];
+  const chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:['1','2','3','4','5'],
+      datasets:[{
+        data:[1,2,3,4,5].map(i=>counts[i]),
+        backgroundColor: colors,
+        borderRadius:6,
+      }]
+    },
+    options: chartOpts('x')
+  });
+  charts.push(chart);
+}
+
+function renderTextList(divId, values){
+  const list = values.slice(-20).reverse();
   const el = document.getElementById(divId);
+  if(!el) return;
   if(!list.length){ el.innerHTML = '<div class="empty">Sin respuestas aún.</div>'; return; }
   el.innerHTML = list.map(v => `<div class="text-item">${escapeHtml(v)}</div>`).join('');
 }
 
-function chartOpts(){
-  return {
+function avgForAttribute(rows, prefix, attrKey){
+  const vals = rows.map(r => parseInt(r[prefix + attrKey])).filter(n => n >= 1 && n <= 5);
+  if(!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0) / vals.length;
+}
+
+function renderAttributeBars(canvasId, rows, prefix, color){
+  const data = ATRIBUTOS.map(a => ({
+    label: a.label,
+    avg: avgForAttribute(rows, prefix, a.key) || 0
+  })).sort((a,b)=>b.avg - a.avg);
+  const ctx = document.getElementById(canvasId);
+  if(!ctx) return;
+  const chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: data.map(d=>d.label),
+      datasets:[{
+        data: data.map(d=>parseFloat(d.avg.toFixed(2))),
+        backgroundColor: color,
+        borderRadius:6,
+      }]
+    },
+    options: {
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>'Promedio: '+c.parsed.x}}},
+      scales:{
+        x:{min:0,max:5,ticks:{stepSize:1,color:'#6b7280',font:{size:11}},grid:{color:'#dbe4f3'}},
+        y:{ticks:{color:'#1a1f36',font:{size:11}},grid:{display:false}}
+      }
+    }
+  });
+  charts.push(chart);
+}
+
+function renderIPA(rows){
+  const points = ATRIBUTOS.map(a => ({
+    x: avgForAttribute(rows, 'p25_', a.key) || 0,
+    y: avgForAttribute(rows, 'p26_', a.key) || 0,
+    label: a.label
+  }));
+
+  const ctx = document.getElementById('ipa_chart');
+  if(!ctx) return;
+
+  const validPts = points.filter(p => p.x > 0 && p.y > 0);
+  const avgX = validPts.length ? validPts.reduce((s,p)=>s+p.x,0) / validPts.length : 3;
+  const avgY = validPts.length ? validPts.reduce((s,p)=>s+p.y,0) / validPts.length : 3;
+
+  const chart = new Chart(ctx, {
+    type:'scatter',
+    data:{
+      datasets:[{
+        label:'Atributos',
+        data: points,
+        backgroundColor:'#1e40c4',
+        borderColor:'#152d8a',
+        pointRadius:8,
+        pointHoverRadius:10,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label: (ctx) => {
+              const p = ctx.raw;
+              return `${p.label} (Imp: ${p.x.toFixed(2)}, Sat: ${p.y.toFixed(2)})`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{
+          min:1, max:5,
+          title:{display:true,text:'Importancia (p25) →',color:'#1e40c4',font:{weight:'bold',size:12}},
+          ticks:{stepSize:0.5,color:'#6b7280'},
+          grid:{color:'#dbe4f3'}
+        },
+        y:{
+          min:1, max:5,
+          title:{display:true,text:'Satisfacción (p26) →',color:'#1e40c4',font:{weight:'bold',size:12}},
+          ticks:{stepSize:0.5,color:'#6b7280'},
+          grid:{color:'#dbe4f3'}
+        }
+      }
+    },
+    plugins:[{
+      id:'pointLabels',
+      afterDatasetsDraw(chart){
+        const {ctx, scales:{x,y}} = chart;
+        ctx.save();
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.fillStyle = '#152d8a';
+        chart.data.datasets[0].data.forEach(p => {
+          if(p.x > 0 && p.y > 0){
+            const xPos = x.getPixelForValue(p.x);
+            const yPos = y.getPixelForValue(p.y);
+            ctx.fillText(p.label, xPos + 12, yPos + 4);
+          }
+        });
+        ctx.strokeStyle = 'rgba(220,38,38,0.4)';
+        ctx.setLineDash([5,5]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x.getPixelForValue(avgX), y.getPixelForValue(1));
+        ctx.lineTo(x.getPixelForValue(avgX), y.getPixelForValue(5));
+        ctx.moveTo(x.getPixelForValue(1), y.getPixelForValue(avgY));
+        ctx.lineTo(x.getPixelForValue(5), y.getPixelForValue(avgY));
+        ctx.stroke();
+        ctx.restore();
+      }
+    }]
+  });
+  charts.push(chart);
+}
+
+function chartOpts(axis){
+  const opts = {
     responsive:true, maintainAspectRatio:false,
     plugins:{legend:{display:false}},
     scales:{
-      x:{ticks:{color:'#a89e8c',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2a2620'}},
-      y:{ticks:{color:'#a89e8c',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2a2620'},beginAtZero:true}
+      x:{ticks:{color:'#6b7280',font:{size:11}},grid:{color:'#dbe4f3'}},
+      y:{ticks:{color:'#6b7280',font:{size:11}},grid:{color:'#dbe4f3'},beginAtZero:true}
     }
   };
+  if(axis === 'y'){
+    opts.indexAxis = 'y';
+    opts.scales.x.beginAtZero = true;
+    opts.scales.y.grid = {display:false};
+  }
+  return opts;
 }
 </script>
 </body>
