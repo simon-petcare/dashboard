@@ -33,11 +33,28 @@
   .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
   .last-update{font-size:11px;color:var(--muted);margin-top:4px;text-align:right}
-  .config{background:var(--card);border-radius:12px;padding:16px 20px;box-shadow:0 2px 10px rgba(30,64,196,.06);margin-bottom:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .config{background:var(--card);border-radius:12px;padding:16px 20px;box-shadow:0 2px 10px rgba(30,64,196,.06);margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .config input{flex:1;min-width:280px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px}
   .config input:focus{outline:none;border-color:var(--primary)}
   .btn{background:var(--primary);color:#fff;border:0;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(30,64,196,.3);transition:.15s}
   .btn:hover{background:var(--primary-dark);transform:translateY(-1px)}
+
+  /* FILTERS */
+  .filter-bar{background:var(--card);border-radius:12px;padding:18px 20px;box-shadow:0 2px 10px rgba(30,64,196,.06);margin-bottom:24px;border-left:4px solid var(--primary)}
+  .filter-bar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+  .filter-bar-title{font-size:14px;font-weight:700;color:var(--primary-dark);display:flex;align-items:center;gap:8px}
+  .filter-count{background:var(--primary);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;min-width:20px;text-align:center}
+  .filter-clear{background:none;border:1px solid var(--warn);color:var(--warn);padding:5px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
+  .filter-clear:hover{background:#fee2e2}
+  .filter-grid{display:flex;flex-wrap:wrap;gap:10px}
+  .filter-group{position:relative}
+  .filter-group select{appearance:none;-webkit-appearance:none;background:var(--primary-soft);border:1px solid var(--border);border-radius:8px;padding:8px 32px 8px 12px;font-size:12px;color:var(--text);cursor:pointer;min-width:150px;transition:.15s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+  .filter-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,64,196,.12)}
+  .filter-group select.active{background:var(--primary);color:#fff;border-color:var(--primary);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")}
+  .filter-group label{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:4px}
+  .filter-summary{font-size:12px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .filter-summary b{color:var(--primary-dark)}
+
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
   .kpi{background:var(--card);border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(30,64,196,.06);position:relative;overflow:hidden}
   .kpi::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:var(--accent)}
@@ -93,6 +110,18 @@
       <summary>Info</summary>
       <p>Lee el Google Sheet publicado como CSV. Para que aparezcan respuestas nuevas, deben pasar al sheet a través del Apps Script (<code>POST</code>) y el sheet debe estar publicado en la web.</p>
     </details>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar" id="filterBar" style="display:none">
+    <div class="filter-bar-header">
+      <div class="filter-bar-title">
+        🔍 Filtros globales <span class="filter-count" id="filterCount">0</span>
+      </div>
+      <button class="filter-clear" id="filterClearBtn" style="display:none" onclick="clearFilters()">✕ Limpiar filtros</button>
+    </div>
+    <div class="filter-grid" id="filterGrid"></div>
+    <div class="filter-summary" id="filterSummary" style="display:none"></div>
   </div>
 
   <div id="errorBox"></div>
@@ -172,9 +201,39 @@ const ATRIBUTOS = [
   {key:'trato_carinoso', label:'Trato cariñoso'},
 ];
 
+/* ── FILTER DEFINITIONS ── */
+const FILTERS = [
+  { id:'f_genero',    label:'👤 Género',              field:'p2',  type:'single' },
+  { id:'f_edad',      label:'🎂 Edad',                field:'p1',  type:'single',
+    order:['18 – 25 años','26 – 35 años','36 – 45 años','46 – 55 años','Más de 55 años'] },
+  { id:'f_distrito',  label:'📍 Distrito',             field:'p5',  type:'single' },
+  { id:'f_tamano',    label:'🐕 Tamaño perro',         field:null,  type:'multi_binary',
+    subcols:{
+      p13_pequeno_menos_de_10_kg:'Pequeño (<10 kg)',
+      p13_mediano_10_a_25_kg:'Mediano (10-25 kg)',
+      p13_grande_mas_de_25_kg:'Grande (>25 kg)'
+    }},
+  { id:'f_vinculo',   label:'❤️ Vínculo emocional',    field:'p14', type:'single' },
+  { id:'f_frecuencia',label:'🔄 Frec. cuidado',        field:'p15', type:'single',
+    order:['Nunca lo he dejado al cuidado de nadie','Rara vez (1 o 2 veces al año)','Ocasionalmente (cada 2 o 3 meses)','Con frecuencia (1 o 2 veces al mes)','Muy seguido (varias veces al mes o semanalmente)'] },
+  { id:'f_conquien',  label:'🐾 ¿Con quién deja?',     field:null,  type:'multi_binary',
+    subcols:{
+      p17_con_un_familiar:'Familiar',
+      p17_con_un_amigo_o_conocido:'Amigo/conocido',
+      p17_con_un_vecino:'Vecino',
+      p17_en_un_hospedaje_canino_u_:'Hospedaje canino',
+      p17_con_un_cuidador_independi:'Cuidador independiente',
+      p17_en_la_veterinaria:'Veterinaria',
+      p17_a_traves_de_una_aplicacio:'App/plataforma',
+      p17_no_he_dejado_a_mi_perro_a:'No lo ha dejado',
+      p17_otro:'Otro'
+    }},
+];
+
 const STORAGE_KEY = 'simon_dashboard_url';
 let charts = [];
 let refreshTimer = null;
+let allRows = [];
 
 window.addEventListener('DOMContentLoaded', () => {
   const saved = sessionStorage.getItem(STORAGE_KEY);
@@ -207,13 +266,142 @@ async function fetchAndRender(url){
       throw new Error('No se pudo parsear el CSV');
     }
     clearError();
-    render(parsed.data);
+    allRows = parsed.data;
+    buildFilterOptions();
+    applyFiltersAndRender();
     document.getElementById('lastUpdate').textContent =
       'Actualizado ' + new Date().toLocaleTimeString('es-PE');
   }catch(err){
     showError('Error al cargar: ' + err.message + '. Verifica que el sheet esté publicado como CSV.');
   }
 }
+
+/* ── FILTER LOGIC ── */
+
+function buildFilterOptions(){
+  if(!allRows.length) return;
+  const bar = document.getElementById('filterBar');
+  bar.style.display = '';
+  const grid = document.getElementById('filterGrid');
+  grid.innerHTML = '';
+
+  FILTERS.forEach(f => {
+    const group = document.createElement('div');
+    group.className = 'filter-group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = f.label;
+    group.appendChild(lbl);
+
+    const sel = document.createElement('select');
+    sel.id = f.id;
+    sel.addEventListener('change', applyFiltersAndRender);
+
+    // Preserve previous selection
+    const prev = document.getElementById(f.id);
+    const prevVal = prev ? prev.value : '';
+
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'Todos';
+    sel.appendChild(allOpt);
+
+    if(f.type === 'single'){
+      let values;
+      if(f.order){
+        values = f.order.filter(v => allRows.some(r => r[f.field] === v));
+        const extras = [...new Set(allRows.map(r=>r[f.field]).filter(v=>v && !f.order.includes(v)))];
+        values = values.concat(extras);
+      } else {
+        const counts = {};
+        allRows.forEach(r => { const v=r[f.field]; if(v) counts[v]=(counts[v]||0)+1; });
+        values = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+      }
+      values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        sel.appendChild(opt);
+      });
+    } else if(f.type === 'multi_binary'){
+      Object.entries(f.subcols).forEach(([col, label]) => {
+        const opt = document.createElement('option');
+        opt.value = col;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+    }
+
+    // Restore previous selection
+    if(prevVal) sel.value = prevVal;
+
+    group.appendChild(sel);
+    grid.appendChild(group);
+  });
+}
+
+function getActiveFilters(){
+  const active = [];
+  FILTERS.forEach(f => {
+    const sel = document.getElementById(f.id);
+    if(!sel || !sel.value) return;
+    active.push({ ...f, value: sel.value });
+  });
+  return active;
+}
+
+function applyFiltersAndRender(){
+  const active = getActiveFilters();
+
+  // Update select styling
+  FILTERS.forEach(f => {
+    const sel = document.getElementById(f.id);
+    if(sel) sel.className = sel.value ? 'active' : '';
+  });
+
+  // Update count badge
+  document.getElementById('filterCount').textContent = active.length;
+  document.getElementById('filterClearBtn').style.display = active.length ? '' : 'none';
+
+  // Filter rows
+  let filtered = allRows;
+  active.forEach(f => {
+    if(f.type === 'single'){
+      filtered = filtered.filter(r => r[f.field] === f.value);
+    } else if(f.type === 'multi_binary'){
+      filtered = filtered.filter(r => {
+        const v = r[f.value];
+        return v && v.toString().trim() && v.toString().toLowerCase() !== 'false' && v.toString() !== '0';
+      });
+    }
+  });
+
+  // Update summary
+  const summary = document.getElementById('filterSummary');
+  if(active.length){
+    const pct = allRows.length ? Math.round(filtered.length / allRows.length * 100) : 0;
+    const labels = active.map(f => {
+      const sel = document.getElementById(f.id);
+      return sel.options[sel.selectedIndex].textContent;
+    });
+    summary.innerHTML = `Mostrando <b>${filtered.length}</b> de ${allRows.length} respuestas (${pct}%) · Filtros: ${labels.join(' · ')}`;
+    summary.style.display = '';
+  } else {
+    summary.style.display = 'none';
+  }
+
+  render(filtered);
+}
+
+function clearFilters(){
+  FILTERS.forEach(f => {
+    const sel = document.getElementById(f.id);
+    if(sel) sel.value = '';
+  });
+  applyFiltersAndRender();
+}
+
+/* ── RENDER ── */
 
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -226,11 +414,12 @@ function render(rows){
   const content = document.getElementById('content');
 
   if(!rows.length){
-    content.innerHTML = '<div class="section"><div class="empty">Aún no hay respuestas en la encuesta. 🐶</div></div>';
+    content.innerHTML = '<div class="section"><div class="empty">No hay respuestas que coincidan con los filtros seleccionados. 🐶</div></div>';
     return;
   }
 
   const total = rows.length;
+  const totalAll = allRows.length;
   const tsField = Object.keys(rows[0]).find(k => /timestamp|marca/i.test(k)) || 'timestamp';
   const dates = rows.map(r => new Date(r[tsField])).filter(d => !isNaN(d));
   const todayStr = new Date().toDateString();
@@ -243,9 +432,12 @@ function render(rows){
 
   const contactos = rows.filter(r => (r.c_nombre && r.c_nombre.trim()) || (r.c_celular && r.c_celular.trim()) || (r.c_email && r.c_email.trim()));
 
+  const isFiltered = getActiveFilters().length > 0;
+  const filterNote = isFiltered ? ` <span style="font-size:12px;font-weight:400;color:var(--muted)">(de ${totalAll})</span>` : '';
+
   let html = `
     <div class="kpis">
-      <div class="kpi"><div class="kpi-emoji">📊</div><div class="kpi-label">Respuestas totales</div><div class="kpi-val">${total}</div><div class="kpi-sub">desde el inicio</div></div>
+      <div class="kpi"><div class="kpi-emoji">📊</div><div class="kpi-label">Respuestas${isFiltered?' (filtradas)':''}</div><div class="kpi-val">${total}${filterNote}</div><div class="kpi-sub">desde el inicio</div></div>
       <div class="kpi"><div class="kpi-emoji">📅</div><div class="kpi-label">Hoy</div><div class="kpi-val">${today}</div><div class="kpi-sub">nuevas respuestas</div></div>
       <div class="kpi"><div class="kpi-emoji">✅</div><div class="kpi-label">Válidas (atención OK)</div><div class="kpi-val">${validResponses}</div><div class="kpi-sub">${total>0?Math.round(validResponses/total*100):0}% del total</div></div>
       <div class="kpi"><div class="kpi-emoji">📨</div><div class="kpi-label">Contactos dejados</div><div class="kpi-val">${contactos.length}</div><div class="kpi-sub">interesados en Simón</div></div>
@@ -265,6 +457,7 @@ function render(rows){
       <div class="ipa-explainer">
         <b>Cómo leer este gráfico:</b> cada punto es un atributo. El eje X es qué tan <b>importante</b> es para los usuarios (p25), el eje Y qué tan <b>satisfechos</b> están con la oferta actual (p26).
         Los puntos en el cuadrante <b>inferior derecho</b> (alta importancia, baja satisfacción) representan las <b>mejores oportunidades</b> para Simón. 🎯
+        ${isFiltered ? '<br><b>⚡ Datos filtrados:</b> el IPA refleja solo el segmento seleccionado.' : ''}
       </div>
       <div class="card">
         <div class="chart-box tall"><canvas id="ipa_chart"></canvas></div>
