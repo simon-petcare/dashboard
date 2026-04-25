@@ -48,12 +48,24 @@
   .filter-clear:hover{background:#fee2e2}
   .filter-grid{display:flex;flex-wrap:wrap;gap:10px}
   .filter-group{position:relative}
-  .filter-group select{background:var(--primary-soft);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text);cursor:pointer;min-width:150px;transition:.15s}
-  .filter-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,64,196,.12)}
-  .filter-group select.active{background:#dbeafe;border-color:var(--primary);color:var(--primary-dark);font-weight:600}
   .filter-group label{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:4px}
   .filter-summary{font-size:12px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
   .filter-summary b{color:var(--primary-dark)}
+
+  /* Multi-select dropdown */
+  .ms-btn{background:var(--primary-soft);border:1px solid var(--border);border-radius:8px;padding:8px 28px 8px 12px;font-size:12px;color:var(--muted);cursor:pointer;min-width:150px;max-width:220px;transition:.15s;position:relative;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-align:left}
+  .ms-btn::after{content:'▾';position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--muted)}
+  .ms-btn.active{background:#dbeafe;border-color:var(--primary);color:var(--primary-dark);font-weight:600}
+  .ms-btn.open{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,64,196,.12)}
+  .ms-panel{display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(30,64,196,.12);z-index:100;min-width:200px;max-height:260px;overflow-y:auto}
+  .ms-panel.show{display:block}
+  .ms-panel::-webkit-scrollbar{width:5px}
+  .ms-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  .ms-opt{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:12px;color:var(--text);cursor:pointer;transition:.08s}
+  .ms-opt:hover{background:var(--primary-soft)}
+  .ms-opt input[type=checkbox]{accent-color:var(--primary);width:14px;height:14px;cursor:pointer;flex-shrink:0}
+  .ms-opt span{flex:1;line-height:1.3}
+  .ms-opt .ms-count{font-size:10px;color:var(--muted);flex-shrink:0}
 
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
   .kpi{background:var(--card);border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(30,64,196,.06);position:relative;overflow:hidden}
@@ -276,7 +288,10 @@ async function fetchAndRender(url){
   }
 }
 
-/* ── FILTER LOGIC ── */
+/* ── FILTER LOGIC (multi-select checkboxes) ── */
+
+// Store selections per filter: { f_genero: ['Femenino','Masculino'], ... }
+let filterSelections = {};
 
 function buildFilterOptions(){
   if(!allRows.length) return;
@@ -286,6 +301,9 @@ function buildFilterOptions(){
   grid.innerHTML = '';
 
   FILTERS.forEach(f => {
+    // Preserve previous selections
+    const prev = filterSelections[f.id] || [];
+
     const group = document.createElement('div');
     group.className = 'filter-group';
 
@@ -293,71 +311,136 @@ function buildFilterOptions(){
     lbl.textContent = f.label;
     group.appendChild(lbl);
 
-    const sel = document.createElement('select');
-    sel.id = f.id;
-    sel.addEventListener('change', applyFiltersAndRender);
-
-    // Preserve previous selection
-    const prev = document.getElementById(f.id);
-    const prevVal = prev ? prev.value : '';
-
-    const allOpt = document.createElement('option');
-    allOpt.value = '';
-    allOpt.textContent = 'Todos';
-    sel.appendChild(allOpt);
-
+    // Build options list: [{value, text, count}]
+    let options = [];
     if(f.type === 'single'){
-      let values;
+      const counts = {};
+      allRows.forEach(r => { const v=r[f.field]; if(v) counts[v]=(counts[v]||0)+1; });
       if(f.order){
-        values = f.order.filter(v => allRows.some(r => r[f.field] === v));
-        const extras = [...new Set(allRows.map(r=>r[f.field]).filter(v=>v && !f.order.includes(v)))];
-        values = values.concat(extras);
+        f.order.forEach(v => { if(counts[v]) options.push({value:v, text:v, count:counts[v]}); });
+        Object.keys(counts).forEach(v => { if(!f.order.includes(v)) options.push({value:v, text:v, count:counts[v]}); });
       } else {
-        const counts = {};
-        allRows.forEach(r => { const v=r[f.field]; if(v) counts[v]=(counts[v]||0)+1; });
-        values = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+        options = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([v,c])=>({value:v, text:v, count:c}));
       }
-      values.forEach(v => {
-        const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        sel.appendChild(opt);
-      });
     } else if(f.type === 'multi_binary'){
       Object.entries(f.subcols).forEach(([col, label]) => {
-        const opt = document.createElement('option');
-        opt.value = col;
-        opt.textContent = label;
-        sel.appendChild(opt);
+        const count = allRows.filter(r => {
+          const v = r[col]; return v && v.toString().trim() && v.toString() !== '0' && v.toString().toLowerCase() !== 'false';
+        }).length;
+        options.push({value:col, text:label, count:count});
       });
+      options.sort((a,b)=>b.count-a.count);
     }
 
-    // Restore previous selection
-    if(prevVal) sel.value = prevVal;
+    // Button
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ms-btn';
+    btn.id = f.id + '_btn';
+    btn.textContent = 'Todos';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close all other panels
+      document.querySelectorAll('.ms-panel.show').forEach(p => {
+        if(p.id !== f.id + '_panel') p.classList.remove('show');
+      });
+      document.querySelectorAll('.ms-btn.open').forEach(b => {
+        if(b.id !== f.id + '_btn') b.classList.remove('open');
+      });
+      const panel = document.getElementById(f.id + '_panel');
+      panel.classList.toggle('show');
+      btn.classList.toggle('open');
+    });
+    group.appendChild(btn);
 
-    group.appendChild(sel);
+    // Dropdown panel
+    const panel = document.createElement('div');
+    panel.className = 'ms-panel';
+    panel.id = f.id + '_panel';
+    panel.addEventListener('click', e => e.stopPropagation());
+
+    options.forEach(opt => {
+      const row = document.createElement('label');
+      row.className = 'ms-opt';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = opt.value;
+      cb.dataset.filterId = f.id;
+      if(prev.includes(opt.value)) cb.checked = true;
+      cb.addEventListener('change', () => onFilterChange(f.id));
+
+      const span = document.createElement('span');
+      span.textContent = opt.text;
+
+      const countSpan = document.createElement('span');
+      countSpan.className = 'ms-count';
+      countSpan.textContent = opt.count;
+
+      row.appendChild(cb);
+      row.appendChild(span);
+      row.appendChild(countSpan);
+      panel.appendChild(row);
+    });
+
+    group.appendChild(panel);
     grid.appendChild(group);
   });
+
+  // Restore button labels
+  FILTERS.forEach(f => updateBtnLabel(f.id));
 }
+
+function onFilterChange(filterId){
+  // Gather checked values
+  const panel = document.getElementById(filterId + '_panel');
+  const checks = panel.querySelectorAll('input[type=checkbox]');
+  const selected = [];
+  checks.forEach(cb => { if(cb.checked) selected.push(cb.value); });
+  filterSelections[filterId] = selected;
+  updateBtnLabel(filterId);
+  applyFiltersAndRender();
+}
+
+function updateBtnLabel(filterId){
+  const btn = document.getElementById(filterId + '_btn');
+  if(!btn) return;
+  const sel = filterSelections[filterId] || [];
+  if(!sel.length){
+    btn.textContent = 'Todos';
+    btn.className = 'ms-btn';
+  } else {
+    // Get text labels from checkboxes
+    const panel = document.getElementById(filterId + '_panel');
+    const labels = [];
+    panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      if(sel.includes(cb.value)){
+        labels.push(cb.parentElement.querySelector('span').textContent);
+      }
+    });
+    btn.textContent = labels.length <= 2 ? labels.join(', ') : labels.slice(0,2).join(', ') + ' +' + (labels.length-2);
+    btn.className = 'ms-btn active';
+  }
+}
+
+// Close panels when clicking outside
+document.addEventListener('click', () => {
+  document.querySelectorAll('.ms-panel.show').forEach(p => p.classList.remove('show'));
+  document.querySelectorAll('.ms-btn.open').forEach(b => b.classList.remove('open'));
+});
 
 function getActiveFilters(){
   const active = [];
   FILTERS.forEach(f => {
-    const sel = document.getElementById(f.id);
-    if(!sel || !sel.value) return;
-    active.push({ ...f, value: sel.value });
+    const sel = filterSelections[f.id] || [];
+    if(!sel.length) return;
+    active.push({ ...f, values: sel });
   });
   return active;
 }
 
 function applyFiltersAndRender(){
   const active = getActiveFilters();
-
-  // Update select styling
-  FILTERS.forEach(f => {
-    const sel = document.getElementById(f.id);
-    if(sel) sel.className = sel.value ? 'active' : '';
-  });
 
   // Update count badge
   document.getElementById('filterCount').textContent = active.length;
@@ -367,11 +450,15 @@ function applyFiltersAndRender(){
   let filtered = allRows;
   active.forEach(f => {
     if(f.type === 'single'){
-      filtered = filtered.filter(r => r[f.field] === f.value);
+      // OR within same filter: row matches if field is any of the selected values
+      filtered = filtered.filter(r => f.values.includes(r[f.field]));
     } else if(f.type === 'multi_binary'){
+      // OR within same filter: row matches if ANY of the selected binary columns = 1
       filtered = filtered.filter(r => {
-        const v = r[f.value];
-        return v && v.toString().trim() && v.toString().toLowerCase() !== 'false' && v.toString() !== '0';
+        return f.values.some(col => {
+          const v = r[col];
+          return v && v.toString().trim() && v.toString() !== '0' && v.toString().toLowerCase() !== 'false';
+        });
       });
     }
   });
@@ -381,8 +468,12 @@ function applyFiltersAndRender(){
   if(active.length){
     const pct = allRows.length ? Math.round(filtered.length / allRows.length * 100) : 0;
     const labels = active.map(f => {
-      const sel = document.getElementById(f.id);
-      return sel.options[sel.selectedIndex].textContent;
+      const panel = document.getElementById(f.id + '_panel');
+      const names = [];
+      panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        if(f.values.includes(cb.value)) names.push(cb.parentElement.querySelector('span').textContent);
+      });
+      return names.join(', ');
     });
     summary.innerHTML = `Mostrando <b>${filtered.length}</b> de ${allRows.length} respuestas (${pct}%) · Filtros: ${labels.join(' · ')}`;
     summary.style.display = '';
@@ -394,10 +485,9 @@ function applyFiltersAndRender(){
 }
 
 function clearFilters(){
-  FILTERS.forEach(f => {
-    const sel = document.getElementById(f.id);
-    if(sel) sel.value = '';
-  });
+  filterSelections = {};
+  document.querySelectorAll('.ms-panel input[type=checkbox]').forEach(cb => cb.checked = false);
+  FILTERS.forEach(f => updateBtnLabel(f.id));
   applyFiltersAndRender();
 }
 
